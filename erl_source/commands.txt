@@ -1,0 +1,8 @@
+cd("C:/Users/Dell/Desktop/Projekt A/src").
+c(event).
+c(eventserv).
+c(eventcli).
+eventserv:start().
+eventserv:subscribe(self()).
+eventcli:create("Client 1").
+eventserv:add_event("Alarm", "Obudz sie", {{2021, 11, 14}, {20, 45, 0}}, 10, 30, second).

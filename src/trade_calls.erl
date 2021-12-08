@@ -90,10 +90,9 @@ t22(PidT1, PidCliT1) ->
 %% test a little bit of everything and also deadlocks on ready state
 %% -- leftover messages possible on race conditions on ready state
 main_ab() ->
-    S = self(),
-    PidCliA = spawn(fun() -> a(S) end),
-    receive PidA -> PidA end,
-    spawn(fun() -> b(PidA, PidCliA) end).
+  S = self(),
+  PidCliA = spawn(fun() -> a(S) end),
+  receive PidA -> spawn(fun() -> b(PidA, PidCliA) end) end.
 
 a(Parent) ->
   {ok, Pid} = trade_fsm:start_link("Carl"),
@@ -102,6 +101,8 @@ a(Parent) ->
   %sys:trace(Pid,true),
   timer:sleep(800),
   trade_fsm:accept_trade(Pid),
+  timer:sleep(400),
+  io:format("~p~n", [trade_fsm:ready(Pid)]),
   timer:sleep(1000),
   trade_fsm:make_offer(Pid, "horse"),
   trade_fsm:make_offer(Pid, "sword"),

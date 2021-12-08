@@ -134,6 +134,12 @@ idle(Event, _From, Data) ->
 
 %% idle_wait allows to expect replies from the other side and
 %% start negotiating for items
+to_new_neg_state(S = #state{other=OtherPID}) ->
+    OwnPID = self(),
+    case OwnPID > OtherPID of
+        true -> S#state{lastPerformer = OtherPID};
+        false -> S#state{lastPerformer = OwnPID}
+    end.
 
 %% the other side asked for a negotiation while we asked for it too.
 %% this means both definitely agree to the idea of doing a trade.
@@ -141,12 +147,12 @@ idle(Event, _From, Data) ->
 idle_wait({ask_negotiate, OtherPid}, S=#state{other=OtherPid}) ->
     gen_fsm:reply(S#state.from, ok),
     notice(S, "[iwait] starting negotiation", []),
-    {next_state, negotiate, S};
+    {next_state, negotiate, to_new_neg_state(S)};
 %% The other side has accepted our offer. Move to negotiate state
 idle_wait({accept_negotiate, OtherPid}, S=#state{other=OtherPid}) ->
     gen_fsm:reply(S#state.from, ok),
     notice(S, "[iwait] starting negotiation", []),
-    {next_state, negotiate, S};
+    {next_state, negotiate, to_new_neg_state(S)};
 %% different call from someone else. Not supported! Let it die.
 idle_wait(Event, Data) ->
     unexpected(Event, idle_wait),
@@ -157,7 +163,7 @@ idle_wait(Event, Data) ->
 idle_wait(accept_negotiate, _From, S=#state{other=OtherPid}) ->
     accept_negotiate(OtherPid, self()),
     notice(S, "[iwait] accepting negotiation", []),
-    {reply, ok, negotiate, S};
+    {reply, ok, negotiate, to_new_neg_state(S)};
 idle_wait(Event, _From, Data) ->
     unexpected(Event, idle_wait),
     {next_state, idle_wait, Data}.
@@ -212,9 +218,15 @@ negotiate(Event, Data) ->
 %% and we add the 'from' to the state so we can reply to the
 %% user once ready.
 negotiate(ready, From, S = #state{other=OtherPid}) ->
-    are_you_ready(OtherPid),
-    notice(S, "[nego] asking if ready, waiting", []),
-    {next_state, wait, S#state{from=From}};
+    case OtherPid == self() of
+        true ->
+            notice(S, "[canc] cancels the retract_offer action, no response was received", []),
+            {next_state, negotiate, S};
+        false ->
+           are_you_ready(OtherPid),
+      notice(S, "asking if ready, waiting", []),
+      {next_state, wait, S#state{from = From, lastPerformer=self()}}
+    end;
 negotiate(Event, _From, S) ->
     unexpected(Event, negotiate),
     {next_state, negotiate, S}.

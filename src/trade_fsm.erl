@@ -209,7 +209,7 @@ negotiate(are_you_ready, S=#state{other=OtherPid}) ->
            "You get ~p, The other side gets ~p",
            [S#state.otheritems, S#state.ownitems]),
     not_yet(OtherPid),
-    {next_state, negotiate, S};
+    {next_state, negotiate, S#state{lastPerformer=OtherPid}};
 negotiate(Event, Data) ->
     unexpected(Event, negotiate),
     {next_state, negotiate, Data}.
@@ -224,8 +224,8 @@ negotiate(ready, From, S = #state{other=OtherPid}) ->
             {next_state, negotiate, S};
         false ->
            are_you_ready(OtherPid),
-      notice(S, "asking if ready, waiting", []),
-      {next_state, wait, S#state{from = From, lastPerformer=self()}}
+           notice(S, "asking if ready, waiting", []),
+           {next_state, wait, S#state{from = From, lastPerformer=self()}}
     end;
 negotiate(Event, _From, S) ->
     unexpected(Event, negotiate),
@@ -234,17 +234,17 @@ negotiate(Event, _From, S) ->
 %% other side offering an item. Don't forget our client is still
 %% waiting for a reply, so let's tell them the trade state changed
 %% and move back to the negotiate state
-wait({do_offer, Item}, S=#state{otheritems=OtherItems}) ->
+wait({do_offer, Item}, S=#state{otheritems=OtherItems, other=OtherPid}) ->
     gen_fsm:reply(S#state.from, offer_changed),
     notice(S, "[wait] other side offering ~p", [Item]),
-    {next_state, negotiate, S#state{otheritems=add(Item, OtherItems)}};
+    {next_state, negotiate, S#state{otheritems=add(Item, OtherItems), lastPerformer=OtherPid}};
 %% other side cancelling an item offer. Don't forget our client is still
 %% waiting for a reply, so let's tell them the trade state changed
 %% and move back to the negotiate state
-wait({undo_offer, Item}, S=#state{otheritems=OtherItems}) ->
+wait({undo_offer, Item}, S=#state{otheritems=OtherItems, other=OtherPid}) ->
     gen_fsm:reply(S#state.from, offer_changed),
     notice(S, "[wait] other side cancelling offer of ~p", [Item]),
-    {next_state, negotiate, S#state{otheritems=remove(Item, OtherItems)}};
+    {next_state, negotiate, S#state{otheritems=remove(Item, OtherItems), lastPerformer=OtherPid}};
 %% The other client falls in ready state and asks us about it.
 %% However, the other client could have moved out of wait state already.
 %% Because of this, we send that we indeed are 'ready!' and hope for them

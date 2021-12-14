@@ -17,7 +17,7 @@
                 otheritems=[],
                 monitor,
                 from,
-                lastPerformer}).
+                lastPerformer}). % ADDED
 
 % IDLE -> IDLE_WAIT -> NEGOTIATE -> WAIT -> READY -> STOP
 
@@ -132,24 +132,24 @@ idle(Event, _From, Data) ->
     unexpected(Event, idle),
     {next_state, idle, Data}.
 
-%% idle_wait allows to expect replies from the other side and
-%% start negotiating for items
-to_new_neg_state(S = #state{other=OtherPID}) ->
+to_new_neg_state(S = #state{other=OtherPID}) -> % ADDED
     OwnPID = self(),
     case OwnPID > OtherPID of
         true -> S#state{lastPerformer = OtherPID};
         false -> S#state{lastPerformer = OwnPID}
     end.
 
+%% idle_wait allows to expect replies from the other side and
+%% start negotiating for items
 %% the other side asked for a negotiation while we asked for it too.
 %% this means both definitely agree to the idea of doing a trade.
 %% Both sides can assume the other feels the same!
-idle_wait({ask_negotiate, OtherPid}, S=#state{other=OtherPid}) ->
+idle_wait({ask_negotiate, OtherPid}, S=#state{other=OtherPid}) -> % MODIFIED
     gen_fsm:reply(S#state.from, ok),
     notice(S, "[iwait] starting negotiation", []),
     {next_state, negotiate, to_new_neg_state(S)};
 %% The other side has accepted our offer. Move to negotiate state
-idle_wait({accept_negotiate, OtherPid}, S=#state{other=OtherPid}) ->
+idle_wait({accept_negotiate, OtherPid}, S=#state{other=OtherPid}) -> % MODIFIED
     gen_fsm:reply(S#state.from, ok),
     notice(S, "[iwait] starting negotiation", []),
     {next_state, negotiate, to_new_neg_state(S)};
@@ -160,7 +160,7 @@ idle_wait(Event, Data) ->
 
 %% Our own client has decided to accept the transaction.
 %% Make the other FSM aware of it and move to negotiate state.
-idle_wait(accept_negotiate, _From, S=#state{other=OtherPid}) ->
+idle_wait(accept_negotiate, _From, S=#state{other=OtherPid}) -> % MODIFIED
     accept_negotiate(OtherPid, self()),
     notice(S, "[iwait] accepting negotiation", []),
     {reply, ok, negotiate, to_new_neg_state(S)};
@@ -169,10 +169,10 @@ idle_wait(Event, _From, Data) ->
     {next_state, idle_wait, Data}.
 
 %% own side offering an item
-negotiate({make_offer, Item}, S=#state{ownitems=OwnItems, lastPerformer=PerformerPID}) ->
-    case PerformerPID == self() of
+negotiate({make_offer, Item}, S=#state{ownitems=OwnItems, lastPerformer=PerformerPid}) -> % MODIFIED
+    case PerformerPid == self() of
         true ->
-            notice(S, "[canc] cancels the make_offer action, no response was received", []),
+            notice(S, "[block] cannot make move, waiting for reaction", []),
             {next_state, negotiate, S};
         false ->
             do_offer(S#state.other, Item),
@@ -181,10 +181,10 @@ negotiate({make_offer, Item}, S=#state{ownitems=OwnItems, lastPerformer=Performe
     end;
 
 %% Own side retracting an item offer
-negotiate({retract_offer, Item}, S=#state{ownitems=OwnItems, lastPerformer=PerformerPID}) ->
-    case PerformerPID == self() of
+negotiate({retract_offer, Item}, S=#state{ownitems=OwnItems, lastPerformer=PerformerPid}) -> % MODIFIED
+    case PerformerPid == self() of
         true ->
-            notice(S, "[canc] cancels the retract_offer action, no response was received", []),
+            notice(S, "[block] cannot make move, waiting for reaction", []),
             {next_state, negotiate, S};
         false ->
             undo_offer(S#state.other, Item),
@@ -192,17 +192,17 @@ negotiate({retract_offer, Item}, S=#state{ownitems=OwnItems, lastPerformer=Perfo
             {next_state, negotiate, S#state{ownitems=remove(Item, OwnItems), lastPerformer=self()}}
     end;
 %% other side offering an item
-negotiate({do_offer, Item}, S=#state{otheritems=OtherItems, other=OtherPID}) ->
+negotiate({do_offer, Item}, S=#state{otheritems=OtherItems, other=OtherPid}) -> % MODIFIED
     notice(S, "[nego] other player offering ~p", [Item]),
-    {next_state, negotiate, S#state{otheritems=add(Item, OtherItems), lastPerformer=OtherPID}};
+    {next_state, negotiate, S#state{otheritems=add(Item, OtherItems), lastPerformer=OtherPid}};
 %% other side retracting an item offer
-negotiate({undo_offer, Item}, S=#state{otheritems=OtherItems, other=OtherPID}) ->
+negotiate({undo_offer, Item}, S=#state{otheritems=OtherItems, other=OtherPid}) -> % MODIFIED
     notice(S, "[nego] other player cancelling offer on ~p", [Item]),
-    {next_state, negotiate, S#state{otheritems=remove(Item, OtherItems), lastPerformer=OtherPID}};
+    {next_state, negotiate, S#state{otheritems=remove(Item, OtherItems), lastPerformer=OtherPid}};
 
 %% Other side has declared itself ready. Our own FSM should tell it to
 %% wait (with not_yet/1).
-negotiate(are_you_ready, S=#state{other=OtherPid}) ->
+negotiate(are_you_ready, S=#state{other=OtherPid}) -> % MODIFIED
     io:format("Other user ready to trade.~n"),
     notice(S,
            "[nego] other user ready to transfer goods:~n"
@@ -217,15 +217,15 @@ negotiate(Event, Data) ->
 %% own user mentioning he is ready. Next state should be wait
 %% and we add the 'from' to the state so we can reply to the
 %% user once ready.
-negotiate(ready, From, S = #state{other=OtherPid}) ->
+negotiate(ready, From, S = #state{other=OtherPid}) -> % MODIFIED
     case OtherPid == self() of
         true ->
             notice(S, "[canc] cancels the retract_offer action, no response was received", []),
             {next_state, negotiate, S};
         false ->
-           are_you_ready(OtherPid),
-           notice(S, "asking if ready, waiting", []),
-           {next_state, wait, S#state{from = From, lastPerformer=self()}}
+            are_you_ready(OtherPid),
+            notice(S, "asking if ready, waiting", []),
+            {next_state, wait, S#state{from = From, lastPerformer=self()}}
     end;
 negotiate(Event, _From, S) ->
     unexpected(Event, negotiate),
@@ -234,14 +234,14 @@ negotiate(Event, _From, S) ->
 %% other side offering an item. Don't forget our client is still
 %% waiting for a reply, so let's tell them the trade state changed
 %% and move back to the negotiate state
-wait({do_offer, Item}, S=#state{otheritems=OtherItems, other=OtherPid}) ->
+wait({do_offer, Item}, S=#state{otheritems=OtherItems, other=OtherPid}) -> % MODIFIED
     gen_fsm:reply(S#state.from, offer_changed),
     notice(S, "[wait] other side offering ~p", [Item]),
     {next_state, negotiate, S#state{otheritems=add(Item, OtherItems), lastPerformer=OtherPid}};
 %% other side cancelling an item offer. Don't forget our client is still
 %% waiting for a reply, so let's tell them the trade state changed
 %% and move back to the negotiate state
-wait({undo_offer, Item}, S=#state{otheritems=OtherItems, other=OtherPid}) ->
+wait({undo_offer, Item}, S=#state{otheritems=OtherItems, other=OtherPid}) -> % MODIFIED
     gen_fsm:reply(S#state.from, offer_changed),
     notice(S, "[wait] other side cancelling offer of ~p", [Item]),
     {next_state, negotiate, S#state{otheritems=remove(Item, OtherItems), lastPerformer=OtherPid}};

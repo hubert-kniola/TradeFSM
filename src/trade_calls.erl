@@ -3,90 +3,6 @@
 
 %% short test
 
-main_test() ->
-    S = self(),
-    PidCliT1 = spawn(fun()-> t1(S) end),
-    receive PidT1 -> PidT1 end,
-    spawn(fun()->t2(PidT1, PidCliT1) end).
-
-t1(Parent) ->
-    {ok, Pid} = trade_fsm:start_link("Carl"),
-    Parent ! Pid,
-    io:format("Spawned Trader 1: ~p~n", [Pid]),
-    %sys:trace(Pid,true),
-    timer:sleep(800),
-    trade_fsm:accept_trade(Pid),
-    timer:sleep(400),
-    io:format("~p~n",[trade_fsm:ready(Pid)]),
-    timer:sleep(1000),
-    trade_fsm:make_offer(Pid, "horse"),
-    trade_fsm:make_offer(Pid, "sword"),
-    timer:sleep(1000),
-    io:format("a synchronizing~n"),
-    sync2(),
-    trade_fsm:ready(Pid),
-    timer:sleep(200),
-    trade_fsm:ready(Pid),
-    timer:sleep(1000).
-
-t2(PidT1, PidCliT1) ->
-    {ok, Pid} = trade_fsm:start_link("Jim"),
-    io:format("Spawned Trader 2: ~p~n", [Pid]),
-    %sys:trace(Pid,true),
-    timer:sleep(500),
-    trade_fsm:trade(Pid, PidT1),
-    trade_fsm:make_offer(Pid, "boots"),
-    timer:sleep(200),
-    trade_fsm:retract_offer(Pid, "boots"),
-    timer:sleep(500),
-    trade_fsm:make_offer(Pid, "shotgun"),
-    timer:sleep(1000),
-    io:format("b synchronizing~n"),
-    sync1(PidCliT1),
-    trade_fsm:make_offer(Pid, "horse"), %% race condition!
-    trade_fsm:ready(Pid),
-    timer:sleep(200),
-    timer:sleep(1000).
-
-main_test2() ->
-    S = self(),
-    PidCliT1 = spawn(fun()-> t11(S) end),
-    receive PidT1 -> PidT1 end,
-    spawn(fun()->t22(PidT1, PidCliT1) end).
-
-t11(Parent) ->
-    {ok, Pid} = trade_fsm:start_link("Carl"),
-    Parent ! Pid,
-    io:format("Spawned Trader 1: ~p~n", [Pid]),
-    %sys:trace(Pid,true),
-    timer:sleep(800),
-    trade_fsm:accept_trade(Pid),
-    timer:sleep(1000),
-    trade_fsm:make_offer(Pid, "horse"),
-    trade_fsm:make_offer(Pid, "sword"),
-    timer:sleep(2500),
-    sync2(),
-    trade_fsm:ready(Pid),
-    timer:sleep(200),
-    timer:sleep(1000).
-
-t22(PidT1, PidCliT1) ->
-    {ok, Pid} = trade_fsm:start_link("Jim"),
-    io:format("Spawned Trader 2: ~p~n", [Pid]),
-    %sys:trace(Pid,true),
-    timer:sleep(500),
-    trade_fsm:trade(Pid, PidT1),
-    trade_fsm:make_offer(Pid, "boots"),
-    timer:sleep(200),
-    trade_fsm:retract_offer(Pid, "boots"),
-    timer:sleep(1000),
-    trade_fsm:make_offer(Pid, "shotgun"),
-    timer:sleep(1000),
-    sync1(PidCliT1),
-    trade_fsm:ready(Pid),
-    timer:sleep(200),
-    timer:sleep(1000).
-
 main_ab1() ->
     S = self(),
     PidCliA = spawn(fun() -> a1(S) end),
@@ -124,11 +40,10 @@ b1(PidA, PidCliA) ->
     trade_fsm:retract_offer(Pid, "boots"),
     timer:sleep(500),
     trade_fsm:make_offer(Pid, "shotgun"),
-    trade_fsm:make_offer(Pid, "shotgun2"),
     timer:sleep(1000),
     io:format("b synchronizing~n"),
     sync1(PidCliA),
-    trade_fsm:make_offer(Pid, "horse"), %% race condition!
+    %trade_fsm:make_offer(Pid, "horse"), %% race condition!
     trade_fsm:ready(Pid),
     timer:sleep(200),
     timer:sleep(1000).
@@ -152,7 +67,7 @@ a(Parent) ->
   io:format("~p~n", [trade_fsm:ready(Pid)]),
   timer:sleep(1000),
   trade_fsm:make_offer(Pid, "horse"),
-  trade_fsm:make_offer(Pid, "sword"),
+  %trade_fsm:make_offer(Pid, "sword"),
   timer:sleep(1000),
   io:format("a synchronizing~n"),
   sync2(),
@@ -168,8 +83,8 @@ b(PidA, PidCliA) ->
   timer:sleep(500),
   trade_fsm:trade(Pid, PidA),
   trade_fsm:make_offer(Pid, "boots"),
-  timer:sleep(200),
-  trade_fsm:retract_offer(Pid, "boots"),
+  timer:sleep(400),
+  %trade_fsm:retract_offer(Pid, "boots"),
   timer:sleep(500),
   trade_fsm:make_offer(Pid, "shotgun"),
   timer:sleep(1000),
